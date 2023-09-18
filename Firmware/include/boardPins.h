@@ -2,7 +2,7 @@
 #define _BOARD_PINS_H
 
 // LEDs
-#define STAT_LED 13
+#define STAT_LED LED_BUILTIN
 #define GREEN_LED 5
 #define RED_LED 6
 
