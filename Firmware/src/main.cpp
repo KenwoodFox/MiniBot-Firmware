@@ -69,7 +69,8 @@ void TaskLEDs(void *pvParameters)
         }
     }
 
-    for (;;) // Task will never return
+    // Task will never return from here
+    for (;;)
     {
         // Lights go off
         digitalWrite(GREEN_LED, false);
