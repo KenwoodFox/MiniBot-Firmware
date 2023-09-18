@@ -15,12 +15,19 @@
 
 // Task Handlers
 TaskHandle_t TaskLEDs_Handler;
+TaskHandle_t TaskButtons_Handler;
+
+// Semaphores/Flags
+bool toggleRed = false;    // True when toggle red
+bool toggleGreen = false;  // True when toggle green
+bool latchDelayOn = false; // True when latched (only unlatch when time expires)
 
 // Hardware Objects
 Bounce2::Button userButton1 = Bounce2::Button();
 
 // Prototypes
 void TaskLEDs(void *pvParameters);
+void TaskButtons(void *pvParameters);
 
 void setup()
 {
@@ -33,9 +40,6 @@ void setup()
     // Pins
     pinMode(STAT_LED, OUTPUT);
 
-    // Buttons
-    userButton1.attach(UB1, INPUT_PULLUP);
-
     // Setup tasks
     xTaskCreate(
         TaskLEDs,           // A pointer to this task in memory
@@ -44,6 +48,37 @@ void setup()
         NULL,               // Parameters passed to the task function
         2,                  // Priority, with 2 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
         &TaskLEDs_Handler); // Task handle
+
+    xTaskCreate(
+        TaskButtons,
+        "TaskButtons",
+        128,
+        NULL,
+        2,
+        &TaskButtons_Handler);
+}
+
+void TaskButtons(void *pvParameters)
+{
+    (void)pvParameters;
+
+    // Setup buttons
+    userButton1.attach(UB1, INPUT_PULLUP);
+
+    for (;;)
+    {
+        userButton1.update(); // Scan this button
+
+        if (userButton1.pressed())
+        {
+            // Runs when physically pressed
+            Log.verboseln("User button one pressed. Toggle is %d", toggleGreen);
+            toggleGreen = !toggleGreen; // Flip!
+        }
+
+        // Related to debounce time
+        vTaskDelay(40 / portTICK_PERIOD_MS);
+    }
 }
 
 void TaskLEDs(void *pvParameters)
@@ -76,12 +111,11 @@ void TaskLEDs(void *pvParameters)
     for (;;)
     {
         // Lights go off
-        digitalWrite(GREEN_LED, false);
+        digitalWrite(GREEN_LED, toggleGreen);
         digitalWrite(RED_LED, false);
 
         // Go to sleep (await cleanup)
-        Log.verboseln("Sleeping");
-        xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);
+        xTaskDelayUntil(&prevTime, 100 / portTICK_PERIOD_MS);
     }
 }
 

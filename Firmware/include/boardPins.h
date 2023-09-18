@@ -3,12 +3,12 @@
 
 // LEDs
 #define STAT_LED LED_BUILTIN
-#define GREEN_LED 5
+#define GREEN_LED 7
 #define RED_LED 6
 
 // Buttons
-#define UB1 2 // Included on hat
-#define UB2 3 // Included on hat
-#define EB3 4 // Our Own
+#define UB1 12 // Our own
+#define UB2 11 // Our own
+#define EB3 10 // Our own
 
 #endif
