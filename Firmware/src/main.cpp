@@ -24,6 +24,7 @@ bool latchDelayOn = false; // True when latched (only unlatch when time expires)
 
 // Hardware Objects
 Bounce2::Button userButton1 = Bounce2::Button();
+Bounce2::Button userButton2 = Bounce2::Button();
 
 // Prototypes
 void TaskLEDs(void *pvParameters);
@@ -64,11 +65,10 @@ void TaskButtons(void *pvParameters)
 
     // Setup buttons
     userButton1.attach(UB1, INPUT_PULLUP);
+    userButton2.attach(UB2, INPUT_PULLUP);
 
     for (;;)
     {
-        userButton1.update(); // Scan this button
-
         if (userButton1.pressed())
         {
             // Runs when physically pressed
@@ -76,7 +76,13 @@ void TaskButtons(void *pvParameters)
             toggleGreen = !toggleGreen; // Flip!
         }
 
-        // Related to debounce time
+        toggleRed = !userButton2.isPressed(); // Oneliner!
+
+        // Update buttons
+        userButton1.update();
+        userButton2.update();
+
+        // Update frequency of this task
         vTaskDelay(40 / portTICK_PERIOD_MS);
     }
 }
@@ -99,8 +105,8 @@ void TaskLEDs(void *pvParameters)
         uint8_t _freq = 5;
         for (uint8_t j = 0; j < _freq * 2; j++)
         {
-            digitalWrite(GREEN_LED, j % 2 == 0);
-            digitalWrite(RED_LED, j % 2 == 0);
+            digitalWrite(GREEN_LED, j % 2 == 0 || toggleGreen);
+            digitalWrite(RED_LED, j % 2 == 0 || toggleRed);
 
             xTaskDelayUntil(&prevTime, (1000 / (_freq * 2)) / portTICK_PERIOD_MS);
         }
@@ -112,7 +118,7 @@ void TaskLEDs(void *pvParameters)
     {
         // Lights go off
         digitalWrite(GREEN_LED, toggleGreen);
-        digitalWrite(RED_LED, false);
+        digitalWrite(RED_LED, toggleRed);
 
         // Go to sleep (await cleanup)
         xTaskDelayUntil(&prevTime, 100 / portTICK_PERIOD_MS);
