@@ -16,6 +16,9 @@
 // Task Handlers
 TaskHandle_t TaskLEDs_Handler;
 
+// Hardware Objects
+Bounce2::Button userButton1 = Bounce2::Button();
+
 // Prototypes
 void TaskLEDs(void *pvParameters);
 
@@ -28,6 +31,9 @@ void setup()
 
     // Pins
     pinMode(STAT_LED, OUTPUT);
+
+    // Buttons
+    userButton1.attach(UB1, INPUT_PULLUP);
 
     // Setup tasks
     xTaskCreate(
