@@ -9,6 +9,6 @@
 // Buttons
 #define UB1 12 // Our own
 #define UB2 11 // Our own
-#define EB3 10 // Our own
+#define UB3 10 // Our own
 
 #endif

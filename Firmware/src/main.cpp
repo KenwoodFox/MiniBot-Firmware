@@ -20,11 +20,12 @@ TaskHandle_t TaskButtons_Handler;
 // Semaphores/Flags
 bool toggleRed = false;    // True when toggle red
 bool toggleGreen = false;  // True when toggle green
-bool latchDelayOn = false; // True when latched (only unlatch when time expires)
+long int latchDelayOn = 0; // True when latched (only unlatch when time expires)
 
 // Hardware Objects
 Bounce2::Button userButton1 = Bounce2::Button();
 Bounce2::Button userButton2 = Bounce2::Button();
+Bounce2::Button userButton3 = Bounce2::Button();
 
 // Prototypes
 void TaskLEDs(void *pvParameters);
@@ -66,6 +67,7 @@ void TaskButtons(void *pvParameters)
     // Setup buttons
     userButton1.attach(UB1, INPUT_PULLUP);
     userButton2.attach(UB2, INPUT_PULLUP);
+    userButton3.attach(UB3, INPUT_PULLUP);
 
     for (;;)
     {
@@ -77,6 +79,12 @@ void TaskButtons(void *pvParameters)
         }
 
         toggleRed = !userButton2.isPressed(); // Oneliner!
+
+        if (userButton3.pressed())
+        {
+            // Could use a semaphore here.
+            latchDelayOn = millis(); // Come back to this later (for set expire)
+        }
 
         // Update buttons
         userButton1.update();
