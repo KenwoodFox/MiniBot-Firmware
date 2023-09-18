@@ -1,24 +1,23 @@
-[![Docs](https://github.com/KenwoodFox/MiniBot/actions/workflows/docs_workflow.yml/badge.svg)](https://github.com/KenwoodFox/MiniBot/actions/workflows/docs_workflow.yml)
-[![Hardware](https://github.com/KenwoodFox/MiniBot/actions/workflows/hardware_workflow.yml/badge.svg)](https://github.com/KenwoodFox/MiniBot/actions/workflows/hardware_workflow.yml)
-[![Firmware](https://github.com/KenwoodFox/MiniBot/actions/workflows/firmware_workflow.yml/badge.svg)](https://github.com/KenwoodFox/MiniBot/actions/workflows/firmware_workflow.yml)
+[![Docs](https://github.com/KenwoodFox/MiniBot-Firmware/actions/workflows/docs_workflow.yml/badge.svg)](https://github.com/KenwoodFox/MiniBot-Firmware/actions/workflows/docs_workflow.yml)
+[![Hardware](https://github.com/KenwoodFox/MiniBot-Firmware/actions/workflows/hardware_workflow.yml/badge.svg)](https://github.com/KenwoodFox/MiniBot-Firmware/actions/workflows/hardware_workflow.yml)
+[![Firmware](https://github.com/KenwoodFox/MiniBot-Firmware/actions/workflows/firmware_workflow.yml/badge.svg)](https://github.com/KenwoodFox/MiniBot-Firmware/actions/workflows/firmware_workflow.yml)
 
 
-# MiniBot
+# MiniBot-Firmware
 
 ![Banner](Static/Banner.png)
 
-This repo contains all the firmware and hardware for the MiniBot.
+This repo contains all the firmware and hardware for the MiniBot-Firmware.
 
-If you're looking for the latest docs/builds, see our [Releases Page](https://github.com/KenwoodFox/MiniBot/releases).
+If you're looking for the latest docs/builds, see our [Releases Page](https://github.com/KenwoodFox/MiniBot-Firmware/releases).
 
 # Getting Started
 
 First, clone this repo (and optionally checkout a branch)
 
 ```shell
-git clone https://github.com/KenwoodFox/MiniBot.git
-cd MiniBot
-git checkout new_board
+git clone https://github.com/KenwoodFox/MiniBot-Firmware.git
+cd MiniBot-Firmware
 ```
 
 # Init Submodules
