@@ -5,6 +5,7 @@
  */
 
 // Libs
+#include <Bounce2.h>
 #include <Arduino.h>
 #include <ArduinoLog.h>
 #include <Arduino_FreeRTOS.h>
