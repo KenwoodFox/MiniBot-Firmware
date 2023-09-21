@@ -20,7 +20,8 @@ TaskHandle_t TaskButtons_Handler;
 // Semaphores/Flags
 bool toggleRed = false;    // True when toggle red
 bool toggleGreen = false;  // True when toggle green
-long int latchDelayOn = 0; // True when latched (only unlatch when time expires)
+const int msOn = 5 * 1000; // Time to remain on when latched
+long int latchTime = 0;    // True when latched (only unlatch when time expires)
 
 // Hardware Objects
 Bounce2::Button userButton1 = Bounce2::Button();
@@ -30,6 +31,7 @@ Bounce2::Button userButton3 = Bounce2::Button();
 // Prototypes
 void TaskLEDs(void *pvParameters);
 void TaskButtons(void *pvParameters);
+bool isLatched();
 
 void setup()
 {
@@ -83,16 +85,23 @@ void TaskButtons(void *pvParameters)
         if (userButton3.pressed())
         {
             // Could use a semaphore here.
-            latchDelayOn = millis(); // Come back to this later (for set expire)
+            Log.verboseln("User button three pressed. Latch was %d, latch was %d", latchTime, isLatched());
+            latchTime = millis(); // Come back to this later (for set expire)
         }
 
         // Update buttons
         userButton1.update();
         userButton2.update();
+        userButton3.update();
 
         // Update frequency of this task
         vTaskDelay(40 / portTICK_PERIOD_MS);
     }
+}
+
+bool isLatched()
+{
+    return latchTime + msOn >= millis();
 }
 
 void TaskLEDs(void *pvParameters)
@@ -125,8 +134,8 @@ void TaskLEDs(void *pvParameters)
     for (;;)
     {
         // Lights go off
-        digitalWrite(GREEN_LED, toggleGreen);
-        digitalWrite(RED_LED, toggleRed);
+        digitalWrite(GREEN_LED, toggleGreen || isLatched());
+        digitalWrite(RED_LED, toggleRed || isLatched());
 
         // Go to sleep (await cleanup)
         xTaskDelayUntil(&prevTime, 100 / portTICK_PERIOD_MS);
