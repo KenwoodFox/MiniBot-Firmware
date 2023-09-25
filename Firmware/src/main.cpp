@@ -137,6 +137,7 @@ void TaskLED(void *pvParameters)
 
     // We are required to run this inital task for 4 seconds.
     Log.infoln("Beginning bootup sequence.");                       // Log we're booting up
+    xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);          // Sleep for 1 sec
     rgb.setPixelColor(0, 1 * maxBrigh, 0, 0);                       // Set Red
     rgb.show();                                                     // Push
     xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);          // Sleep for 1 sec
