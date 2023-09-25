@@ -45,7 +45,7 @@ void setup()
     Serial.begin(115200); // USB (debug)
     Serial.print("\n\n");
     Log.begin(LOG_LEVEL_VERBOSE, &Serial);
-    Log.infoln("Beginning user code! Version %s", REVISION);
+    Log.infoln("Init: Beginning user code! Version %s", REVISION);
 
     // Pins
     pinMode(STAT_LED, OUTPUT);
@@ -53,7 +53,7 @@ void setup()
     // Setup tasks
     xTaskCreate(
         TaskLED,            // A pointer to this task in memory
-        "TaskLED",          // A name just for humans
+        "LEDs",             // A name just for humans
         128,                // This stack size can be checked & adjusted by reading the Stack Highwater
         NULL,               // Parameters passed to the task function
         2,                  // Priority, with 2 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
@@ -61,7 +61,7 @@ void setup()
 
     xTaskCreate(
         TaskButtons,
-        "TaskButtons",
+        "Buttons",
         128,
         NULL,
         2,
@@ -89,22 +89,22 @@ void TaskButtons(void *pvParameters)
         {
             // Runs when physically pressed
             uIntens[chosenColor] = uIntens[chosenColor] + 0.1 <= 1.0 ? uIntens[chosenColor] + 0.1 : 1; // Updates and clamps
-            Log.verboseln("User button one pressed. Increasing component %d to %F", chosenColor, uIntens[chosenColor]);
+            Log.verboseln("%s: UB1 Pressed, increase color %d to %F", pcTaskGetName(NULL), chosenColor, uIntens[chosenColor]);
         }
 
         if (userButton2.pressed())
         {
             // Runs when physically pressed
             uIntens[chosenColor] = uIntens[chosenColor] - 0.1 >= 0.0 ? uIntens[chosenColor] - 0.1 : 0; // Updates and clamps
-            Log.verboseln("User button two pressed. Decreasing component %d to %F", chosenColor, uIntens[chosenColor]);
+            Log.verboseln("%s: UB2 Pressed, decrease color %d to %F", pcTaskGetName(NULL), chosenColor, uIntens[chosenColor]);
         }
 
         if (userButton3.pressed())
         {
             // UB 3 changes the currently selected color.
             chosenColor++;
-            Log.verboseln("Chosen color is now %s", chosenColor == RED ? "red" : chosenColor == GREEN ? "green"
-                                                                                                      : "blue");
+            Log.verboseln("%s: Chosen color is now %s", pcTaskGetName(NULL), chosenColor == RED ? "red" : chosenColor == GREEN ? "green"
+                                                                                                                               : "blue");
         }
 
         // Update buttons
@@ -117,7 +117,7 @@ void TaskButtons(void *pvParameters)
         {
             lastBrightness = _brightness;
             curBrightness = _brightness / 1024.0;
-            Log.verboseln("Brightness is now %F", curBrightness);
+            Log.verboseln("%s: Brightness is now %F", pcTaskGetName(NULL), curBrightness);
         }
 
         // Update frequency of this task
@@ -136,21 +136,21 @@ void TaskLED(void *pvParameters)
     TickType_t prevTime;
 
     // We are required to run this inital task for 4 seconds.
-    Log.infoln("Beginning bootup sequence.");                       // Log we're booting up
-    xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);          // Sleep for 1 sec
-    rgb.setPixelColor(0, 1 * maxBrigh, 0, 0);                       // Set Red
-    rgb.show();                                                     // Push
-    xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);          // Sleep for 1 sec
-    rgb.setPixelColor(0, 0, 1 * maxBrigh, 0);                       // Green
-    rgb.show();                                                     // Push
-    xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);          // Sleep for 1 sec
-    rgb.setPixelColor(0, 0, 0, 1 * maxBrigh);                       // Blue
-    rgb.show();                                                     // Push
-    xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);          // Sleep for 1 sec
-    rgb.setPixelColor(0, 1 * maxBrigh, 1 * maxBrigh, 1 * maxBrigh); // White
-    rgb.show();                                                     // Push
-    xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);          // Sleep for 1 sec
-    Log.infoln("Bootup done");                                      // Done
+    Log.infoln("%s: Beginning bootup sequence.", pcTaskGetName(NULL)); // Log we're booting up
+    xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);             // Sleep for 1 sec
+    rgb.setPixelColor(0, 1 * maxBrigh, 0, 0);                          // Set Red
+    rgb.show();                                                        // Push
+    xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);             // Sleep for 1 sec
+    rgb.setPixelColor(0, 0, 1 * maxBrigh, 0);                          // Green
+    rgb.show();                                                        // Push
+    xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);             // Sleep for 1 sec
+    rgb.setPixelColor(0, 0, 0, 1 * maxBrigh);                          // Blue
+    rgb.show();                                                        // Push
+    xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);             // Sleep for 1 sec
+    rgb.setPixelColor(0, 1 * maxBrigh, 1 * maxBrigh, 1 * maxBrigh);    // White
+    rgb.show();                                                        // Push
+    xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);             // Sleep for 1 sec
+    Log.infoln("%s: Bootup done", pcTaskGetName(NULL));                // Done
 
     // Task will never return from here
     for (;;)
