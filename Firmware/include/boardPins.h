@@ -1,3 +1,5 @@
+#include <Arduino.h>
+
 #ifndef _BOARD_PINS_H
 #define _BOARD_PINS_H
 
@@ -13,5 +15,6 @@
 
 // RGB LED
 #define NEO_PIN 38
+#define BRIGHTNESS_PIN A0
 
 #endif
