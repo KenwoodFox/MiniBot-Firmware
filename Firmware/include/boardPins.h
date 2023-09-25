@@ -11,4 +11,7 @@
 #define UB2 11 // Our own
 #define UB3 10 // Our own
 
+// RGB LED
+#define NEO_PIN 38
+
 #endif

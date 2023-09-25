@@ -9,6 +9,7 @@
 #include <Arduino.h>
 #include <ArduinoLog.h>
 #include <Arduino_FreeRTOS.h>
+#include <Adafruit_NeoPixel.h>
 
 // Headers
 #include "boardPins.h"
@@ -23,10 +24,14 @@ bool toggleGreen = false;  // True when toggle green
 const int msOn = 5 * 1000; // Time to remain on when latched
 long int latchTime = 0;    // True when latched (only unlatch when time expires)
 
+// Config
+const float maxBrigh = 18; // Joe's eyes hurt!
+
 // Hardware Objects
 Bounce2::Button userButton1 = Bounce2::Button();
 Bounce2::Button userButton2 = Bounce2::Button();
 Bounce2::Button userButton3 = Bounce2::Button();
+Adafruit_NeoPixel rgb(1, NEO_PIN, NEO_GRB + NEO_KHZ800);
 
 // Prototypes
 void TaskLEDs(void *pvParameters);
@@ -71,6 +76,9 @@ void TaskButtons(void *pvParameters)
     userButton2.attach(UB2, INPUT_PULLUP);
     userButton3.attach(UB3, INPUT_PULLUP);
 
+    // Setup objects
+    rgb.begin();
+
     for (;;)
     {
         if (userButton1.pressed())
@@ -93,6 +101,14 @@ void TaskButtons(void *pvParameters)
         userButton1.update();
         userButton2.update();
         userButton3.update();
+
+        // LEDs
+        bool _roll = millis() % 1000 > 500;
+        rgb.setPixelColor(0,
+                          _roll * maxBrigh,
+                          !_roll * maxBrigh,
+                          0);
+        rgb.show();
 
         // Update frequency of this task
         vTaskDelay(40 / portTICK_PERIOD_MS);
