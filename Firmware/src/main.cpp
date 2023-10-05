@@ -17,6 +17,10 @@ float RPM_B = 0;
 
 int PWM = 0;
 
+// Prototype Functions
+void ISR_A();
+void ISR_B();
+
 void setup()
 {
 
