@@ -1,104 +1,192 @@
-#define MotorPWM_A 46 // left motor
-#define MotorPWM_B 44 // right motor
-#define INA1A 32
-#define INA2A 34
-#define INA1B 30
-#define INA2B 36
+/**
+ * @file main.cpp
+ * @author Team 7
+ * @brief Source code for MiniBot
+ */
 
+// Libs
+#include <Bounce2.h>
 #include <Arduino.h>
+#include <ArduinoLog.h>
+#include <Arduino_FreeRTOS.h>
+#include <Adafruit_NeoPixel.h>
 
-static volatile int count_A = 0;
-static volatile int count_B = 0;
+// Headers
+#include "boardPins.h"
+#include "color.h"
+#include "config.h"
 
-#define ENCODER 2
-static volatile int16_t count = 0;
-float RPM_A = 0;
-float RPM_B = 0;
+// Task Handlers
+TaskHandle_t TaskLEDs_Handler;
+TaskHandle_t TaskStarPID_Handler;
+TaskHandle_t TaskPortPID_Handler;
+Adafruit_NeoPixel rgb(1, NEO_PIN, NEO_GRB + NEO_KHZ800);
 
-int PWM = 0;
+// Prototypes
+void TaskLED(void *pvParameters);
+void TaskPID(void *pvParameters); // The nice thing about these task prototypes is we can redefine new ones using new pvparams!
 
-// Prototype Functions
-void ISR_A();
-void ISR_B();
+// TODO: Move this somewhere else
+struct PIDConfig
+{
+    uint8_t _p;
+    uint8_t _i;
+    uint8_t _d;
+};
 
 void setup()
 {
+    // Setup serial
+    Serial.begin(115200); // USB (debug)
+    Serial.print("\n\n");
+    Log.begin(LOG_LEVEL_VERBOSE, &Serial);
+    Log.infoln("Init: Beginning user code! Version %s", REVISION);
 
-    Serial.begin(9600);
-    pinMode(MotorPWM_A, OUTPUT);
-    pinMode(MotorPWM_B, OUTPUT);
-    pinMode(INA1A, OUTPUT);
-    pinMode(INA2A, OUTPUT);
-    pinMode(INA1B, OUTPUT);
-    pinMode(INA2B, OUTPUT);
+    // Pins
+    pinMode(LED_BUILTIN, OUTPUT);
 
-    pinMode(2, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(2), ISR_A, FALLING);
-    pinMode(3, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(3), ISR_B, FALLING);
+    // Setup tasks
+    xTaskCreate(
+        TaskLED,            // A pointer to this task in memory
+        "LEDs",             // A name just for humans
+        128,                // This stack size can be checked & adjusted by reading the Stack Highwater
+        NULL,               // Parameters passed to the task function
+        2,                  // Priority, with 2 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
+        &TaskLEDs_Handler); // Task handle
+
+    // Spawn the same task template twice, putting two coppies in memory
+    xTaskCreate(
+        TaskPID,
+        "StarPID",
+        128,
+        NULL,
+        2,
+        &TaskStarPID_Handler);
+
+    xTaskCreate(
+        TaskPID,
+        "PortPID",
+        128,
+        NULL,
+        2,
+        &TaskPortPID_Handler);
 }
 
-void RPM()
+void TaskPID(void *pvParameters)
 {
-    count_A = 0;
-    count_B = 0;
-    delay(100);
-    RPM_A = count_A * 3.125;
-    RPM_B = count_B * 3.125;
-    // Serial.print("RPM A = ");
-    Serial.print(RPM_A);
-    // Serial.print("RPM B = ");
-    Serial.print(" ");
-    Serial.println(RPM_B);
+    (void)pvParameters;
+    // Setup here
+
+    Log.infoln("%s: Ready.", pcTaskGetName(NULL)); // Log we're booting up
+
+    // Actually i want to try using some param values
+
+    for (;;)
+    {
+        // Forever
+
+        // PID response here
+
+        /**
+         * External things we need
+         *
+         * - Target setpoint, could use a global var in memory or possibly experiment with semaphores!
+         * - External encoder hookup, polling kinda sucks so lets just use the built in. (mega only runs at like, 8mhz)
+         * - Dual tasks for each side. Use one task def, but spawn it twice in setup. Twice the memory, half the headache.
+         */
+
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
 }
 
-void ISR_A()
-{
-    count_A++;
-}
+// void TaskButtons(void *pvParameters)
+// {
+//     (void)pvParameters;
 
-void ISR_B()
-{
-    count_B++;
-}
+//     // Setup buttons
+//     userButton1.attach(UB1, INPUT_PULLUP);
+//     userButton2.attach(UB2, INPUT_PULLUP);
+//     userButton3.attach(UB3, INPUT_PULLUP);
 
-void Forward()
-{
-    analogWrite(MotorPWM_A, PWM);
-    analogWrite(MotorPWM_B, PWM);
-    digitalWrite(INA1A, 1);
-    digitalWrite(INA2A, 0);
-    digitalWrite(INA1B, 1);
-    digitalWrite(INA2B, 0);
-}
+//     // Setup pot
+//     pinMode(BRIGHTNESS_PIN, INPUT);
 
-void Backward()
-{
-    analogWrite(MotorPWM_A, 255);
-    analogWrite(MotorPWM_B, 255);
-    digitalWrite(INA1A, 0);
-    digitalWrite(INA2A, 1);
-    digitalWrite(INA1B, 0);
-    digitalWrite(INA2B, 1);
-}
+//     // Setup objects
+//     rgb.begin();
 
-void Stop()
+//     for (;;)
+//     {
+//         if (userButton1.pressed())
+//         {
+//             // Runs when physically pressed
+//             uIntens[chosenColor] = uIntens[chosenColor] + 0.1 <= 1.0 ? uIntens[chosenColor] + 0.1 : 1; // Updates and clamps
+//             Log.verboseln("%s: UB1 Pressed, increase color %d to %F", pcTaskGetName(NULL), chosenColor, uIntens[chosenColor]);
+//         }
+
+//         if (userButton2.pressed())
+//         {
+//             // Runs when physically pressed
+//             uIntens[chosenColor] = uIntens[chosenColor] - 0.1 >= 0.0 ? uIntens[chosenColor] - 0.1 : 0; // Updates and clamps
+//             Log.verboseln("%s: UB2 Pressed, decrease color %d to %F", pcTaskGetName(NULL), chosenColor, uIntens[chosenColor]);
+//         }
+
+//         if (userButton3.pressed())
+//         {
+//             // UB 3 changes the currently selected color.
+//             chosenColor++;
+//             Log.verboseln("%s: Chosen color is now %s", pcTaskGetName(NULL), chosenColor == RED ? "red" : chosenColor == GREEN ? "green"
+//                                                                                                                                : "blue");
+//         }
+
+//         // Update buttons
+//         userButton1.update();
+//         userButton2.update();
+//         userButton3.update();
+
+//         int _brightness = analogRead(BRIGHTNESS_PIN);
+//         if (abs(_brightness - lastBrightness) > 10)
+//         {
+//             lastBrightness = _brightness;
+//             curBrightness = _brightness / 1024.0;
+//             Log.verboseln("%s: Brightness is now %F", pcTaskGetName(NULL), curBrightness);
+//         }
+
+//         // Update frequency of this task
+//         vTaskDelay(40 / portTICK_PERIOD_MS);
+//     }
+// }
+
+void TaskLED(void *pvParameters)
 {
-    analogWrite(MotorPWM_A, 0);
-    analogWrite(MotorPWM_B, 0);
+    (void)pvParameters;
+    // Setup here
+
+    // Prev time
+    TickType_t prevTime;
+
+    // We are required to run this inital task for 4 seconds.
+    Log.infoln("%s: Beginning bootup sequence.", pcTaskGetName(NULL)); // Log we're booting up
+    xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);             // Sleep for 1 sec
+    rgb.setPixelColor(0, 1 * maxBrigh, 0, 0);                          // Set Red
+    rgb.show();                                                        // Push
+    xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);             // Sleep for 1 sec
+    rgb.setPixelColor(0, 0, 1 * maxBrigh, 0);                          // Green
+    rgb.show();                                                        // Push
+    xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);             // Sleep for 1 sec
+    Log.infoln("%s: Bootup done", pcTaskGetName(NULL));                // Done
+
+    // Task will never return from here
+    for (;;)
+    {
+        // Nothing to do here.
+
+        // Go to sleep (await cleanup)
+        xTaskDelayUntil(&prevTime, 100 / portTICK_PERIOD_MS);
+    }
 }
 
 void loop()
 {
-
-    for (int i = 0; i < 52; i++)
-    {
-        delay(1000);
-        PWM = i * 5;
-        Forward();
-        RPM();
-    }
-    Stop();
-    while (1)
-        ;
+    // Nothing in loop!
+    ;
 }
