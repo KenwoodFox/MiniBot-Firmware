@@ -29,9 +29,15 @@ void TaskPID(void *pvParameters); // The nice thing about these task prototypes 
 // TODO: Move this somewhere else
 struct PIDConfig
 {
-    uint8_t _p;
-    uint8_t _i;
-    uint8_t _d;
+    // PID Tuning Values
+    double _p;
+    double _i;
+    double _d;
+
+    // Motor Controller Pins
+    uint8_t _aPin;
+    uint8_t _bPin;
+    uint8_t _pwmPin;
 };
 
 void setup()
@@ -45,7 +51,7 @@ void setup()
     // Pins
     pinMode(LED_BUILTIN, OUTPUT);
 
-    // Setup tasks
+    // Setup regular tasks
     xTaskCreate(
         TaskLED,            // A pointer to this task in memory
         "LEDs",             // A name just for humans
@@ -54,12 +60,16 @@ void setup()
         2,                  // Priority, with 2 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
         &TaskLEDs_Handler); // Task handle
 
-    // Spawn the same task template twice, putting two coppies in memory
+    // Setup PID Configs
+    static PIDConfig starPIDConfig = {1.0, 0.1, 0.1, INA1A, INA2A, MotorPWM_A};
+    static PIDConfig portPIDConfig = {1.0, 0.1, 0.1, INA1B, INA2B, MotorPWM_B};
+
+    // Spawn the same task template twice, putting two copies in memory
     xTaskCreate(
         TaskPID,
         "StarPID",
         128,
-        NULL,
+        &starPIDConfig,
         2,
         &TaskStarPID_Handler);
 
@@ -67,23 +77,27 @@ void setup()
         TaskPID,
         "PortPID",
         128,
-        NULL,
+        &portPIDConfig,
         2,
         &TaskPortPID_Handler);
 }
 
 void TaskPID(void *pvParameters)
 {
-    (void)pvParameters;
+    PIDConfig *config = (PIDConfig *)pvParameters; // We're going to cast the pointer this task was created with, to a config struct.
     // Setup here
-
     Log.infoln("%s: Ready.", pcTaskGetName(NULL)); // Log we're booting up
+    Log.infoln("%s: Using INA pin %d, PID values are %D, %D, %D", pcTaskGetName(NULL), config->_aPin, config->_p, config->_i, config->_d);
 
-    // Actually i want to try using some param values
+    pinMode(config->_aPin, OUTPUT);
+    pinMode(config->_bPin, OUTPUT);
+    pinMode(config->_pwmPin, OUTPUT);
 
-    for (;;)
+    for (;;) // Run forever
     {
-        // Forever
+        analogWrite(config->_pwmPin, 255); // PWM out
+        digitalWrite(config->_aPin, 1);
+        digitalWrite(config->_bPin, 0);
 
         // PID response here
 
@@ -160,6 +174,7 @@ void TaskLED(void *pvParameters)
 {
     (void)pvParameters;
     // Setup here
+    rgb.begin();
 
     // Prev time
     TickType_t prevTime;
