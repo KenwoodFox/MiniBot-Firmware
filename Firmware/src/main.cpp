@@ -29,6 +29,9 @@ void TaskPID(void *pvParameters); // The nice thing about these task prototypes 
 // TODO: Move this somewhere else
 struct PIDConfig
 {
+    // General
+    bool inverted;
+
     // PID Tuning Values
     double _p;
     double _i;
@@ -61,8 +64,8 @@ void setup()
         &TaskLEDs_Handler); // Task handle
 
     // Setup PID Configs
-    static PIDConfig starPIDConfig = {1.0, 0.1, 0.1, INA1A, INA2A, MotorPWM_A};
-    static PIDConfig portPIDConfig = {1.0, 0.1, 0.1, INA1B, INA2B, MotorPWM_B};
+    static PIDConfig starPIDConfig = {true, 1.0, 0.1, 0.1, INA1A, INA2A, MotorPWM_A};
+    static PIDConfig portPIDConfig = {false, 1.0, 0.1, 0.1, INA1B, INA2B, MotorPWM_B};
 
     // Spawn the same task template twice, putting two copies in memory
     xTaskCreate(
@@ -95,9 +98,10 @@ void TaskPID(void *pvParameters)
 
     for (;;) // Run forever
     {
-        analogWrite(config->_pwmPin, 255); // PWM out
-        digitalWrite(config->_aPin, 1);
-        digitalWrite(config->_bPin, 0);
+        // Test motor writing
+        analogWrite(config->_pwmPin, 90); // PWM out
+        digitalWrite(config->_aPin, config->inverted ? HIGH : LOW);
+        digitalWrite(config->_bPin, config->inverted ? LOW : HIGH);
 
         // PID response here
 
