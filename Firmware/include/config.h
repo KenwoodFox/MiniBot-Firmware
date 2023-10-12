@@ -21,4 +21,7 @@ struct PIDConfig
     uint8_t _aPin;
     uint8_t _bPin;
     uint8_t _pwmPin;
+
+    // Pointers to external values
+    volatile long int *encPtr;
 };

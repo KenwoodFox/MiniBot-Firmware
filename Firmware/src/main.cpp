@@ -48,12 +48,14 @@ void setup()
         &TaskLEDs_Handler); // Task handle
 
     // Configure hardware inturrupts
+    pinMode(STAR_ENC, INPUT_PULLUP);
+    pinMode(PORT_ENC, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(STAR_ENC), isrHandlerStar, FALLING);
     attachInterrupt(digitalPinToInterrupt(PORT_ENC), isrHandlerPort, FALLING);
 
     // Setup PID Configs
-    static PIDConfig starPIDConfig = {true, 1.0, 0.1, 0.1, INA1A, INA2A, MotorPWM_A};
-    static PIDConfig portPIDConfig = {false, 1.0, 0.1, 0.1, INA1B, INA2B, MotorPWM_B};
+    static PIDConfig starPIDConfig = {true, 1.0, 0.1, 0.1, INA1A, INA2A, MotorPWM_A, &starPulse};
+    static PIDConfig portPIDConfig = {false, 1.0, 0.1, 0.1, INA1B, INA2B, MotorPWM_B, &portPulse};
 
     // Spawn the same task template twice, putting two copies in memory
     xTaskCreate(
@@ -64,13 +66,13 @@ void setup()
         2,
         &TaskStarPID_Handler);
 
-    xTaskCreate(
-        TaskPID,
-        "PortPID",
-        128,
-        &portPIDConfig,
-        2,
-        &TaskPortPID_Handler);
+    // xTaskCreate(
+    //     TaskPID,
+    //     "PortPID",
+    //     128,
+    //     &portPIDConfig,
+    //     2,
+    //     &TaskPortPID_Handler);
 }
 
 void TaskLED(void *pvParameters)

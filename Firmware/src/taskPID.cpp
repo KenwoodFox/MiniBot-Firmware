@@ -28,12 +28,28 @@ void TaskPID(void *pvParameters)
      *
      */
 
+    int curspeed = 0; // 0 to 255
+    long int lastPulse = 0;
+
     for (;;) // Run forever
     {
         // Test motor writing
-        analogWrite(config->_pwmPin, 90); // PWM out
+        analogWrite(config->_pwmPin, curspeed); // PWM out
         digitalWrite(config->_aPin, config->inverted ? HIGH : LOW);
         digitalWrite(config->_bPin, config->inverted ? LOW : HIGH);
+
+        // Should be able to read from that pointer
+        // Log.infoln("%s: Motor pulse is %d.", pcTaskGetName(NULL), *config->encPtr);
+
+        Log.infoln("%s: (%l, %d)", pcTaskGetName(NULL), (*config->encPtr - lastPulse) * 10, curspeed);
+
+        curspeed++;
+        lastPulse = *config->encPtr;
+
+        if (curspeed == 255)
+        {
+            curspeed = 0;
+        }
 
         // PID response here
 

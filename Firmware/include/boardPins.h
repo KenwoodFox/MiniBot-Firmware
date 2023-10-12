@@ -8,15 +8,15 @@
 #define BRIGHTNESS_PIN A0
 
 // Motor controllers
-#define MotorPWM_A 46 // port motor
-#define MotorPWM_B 44 // star motor
+#define MotorPWM_A 4 // port motor
+#define MotorPWM_B 5 // star motor
 #define INA1A 32
 #define INA2A 34
 #define INA1B 30
 #define INA2B 36
 
 // Encoders
-#define STAR_ENC 3
-#define PORT_ENC 2
+#define STAR_ENC 2
+#define PORT_ENC 3
 
 #endif
