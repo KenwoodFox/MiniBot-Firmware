@@ -1,5 +1,4 @@
 [![Docs](https://github.com/KenwoodFox/MiniBot-Firmware/actions/workflows/docs_workflow.yml/badge.svg)](https://github.com/KenwoodFox/MiniBot-Firmware/actions/workflows/docs_workflow.yml)
-[![Hardware](https://github.com/KenwoodFox/MiniBot-Firmware/actions/workflows/hardware_workflow.yml/badge.svg)](https://github.com/KenwoodFox/MiniBot-Firmware/actions/workflows/hardware_workflow.yml)
 [![Firmware](https://github.com/KenwoodFox/MiniBot-Firmware/actions/workflows/firmware_workflow.yml/badge.svg)](https://github.com/KenwoodFox/MiniBot-Firmware/actions/workflows/firmware_workflow.yml)
 
 
