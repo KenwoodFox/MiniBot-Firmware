@@ -24,4 +24,5 @@ struct PIDConfig
 
     // Pointers to external values
     volatile long int *encPtr;
+    double *setPoint;
 };

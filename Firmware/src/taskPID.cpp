@@ -35,11 +35,8 @@ void TaskPID(void *pvParameters)
 
     // Construct a simple PID controller
     double curSpeed; // Curspeed is our input value
-    double setPoint; // The target speed
     double setSpeed; // The output speed
-    PID localPID(&curSpeed, &setSpeed, &setPoint, config->_p, config->_i, config->_d, DIRECT);
-
-    setPoint = 300; // We want to target a specific RPM TODO: DELETE ME!
+    PID localPID(&curSpeed, &setSpeed, &*config->setPoint, config->_p, config->_i, config->_d, DIRECT);
 
     long int lastPulse; // The last encoder pulse
 

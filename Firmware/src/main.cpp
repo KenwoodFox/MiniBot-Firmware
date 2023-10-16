@@ -27,6 +27,11 @@ Adafruit_NeoPixel rgb(1, NEO_PIN, NEO_GRB + NEO_KHZ800);
 void TaskLED(void *pvParameters);
 void TaskPID(void *pvParameters); // The nice thing about these task prototypes is we can redefine new ones using new pvparams!
 
+// Controls
+const long int eventsTo90 = 600;
+double starSetpoint = 0.0;
+double portSetpoint = 0.0;
+
 void setup()
 {
     // Setup serial
@@ -54,25 +59,25 @@ void setup()
     attachInterrupt(digitalPinToInterrupt(PORT_ENC), isrHandlerPort, FALLING);
 
     // Setup PID Configs
-    static PIDConfig starPIDConfig = {true, 1.0, 0.1, 0.1, INA1A, INA2A, MotorPWM_A, &starPulse};
-    static PIDConfig portPIDConfig = {false, 1.0, 0.1, 0.1, INA1B, INA2B, MotorPWM_B, &portPulse};
+    static PIDConfig starPIDConfig = {true, 2.0, 1.0, 0.9, INA1A, INA2A, MotorPWM_A, &starPulse, &starSetpoint};
+    static PIDConfig portPIDConfig = {false, 2.0, 1.0, 0.9, INA1B, INA2B, MotorPWM_B, &portPulse, &portSetpoint};
 
     // Spawn the same task template twice, putting two copies in memory
     xTaskCreate(
         TaskPID,
         "StarPID",
-        128,
+        160,
         &starPIDConfig,
         2,
         &TaskStarPID_Handler);
 
-    // xTaskCreate(
-    //     TaskPID,
-    //     "PortPID",
-    //     128,
-    //     &portPIDConfig,
-    //     2,
-    //     &TaskPortPID_Handler);
+    xTaskCreate(
+        TaskPID,
+        "PortPID",
+        160,
+        &portPIDConfig,
+        2,
+        &TaskPortPID_Handler);
 }
 
 void TaskLED(void *pvParameters)
@@ -95,10 +100,27 @@ void TaskLED(void *pvParameters)
     xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);             // Sleep for 1 sec
     Log.infoln("%s: Bootup done", pcTaskGetName(NULL));                // Done
 
+    // Pause for a bit
+    xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);
+
     // Task will never return from here
     for (;;)
     {
-        // Nothing to do here.
+        // Setpoints
+        starSetpoint += 500;
+        portSetpoint += 500;
+
+        rgb.setPixelColor(0, 1 * maxBrigh, 0, 0);
+        rgb.show();
+
+        xTaskDelayUntil(&prevTime, 2000 / portTICK_PERIOD_MS);
+
+        starSetpoint += eventsTo90;
+
+        rgb.setPixelColor(0, 0, 1 * maxBrigh, 0);
+        rgb.show();
+
+        xTaskDelayUntil(&prevTime, 1500 / portTICK_PERIOD_MS);
 
         // Go to sleep (await cleanup)
         xTaskDelayUntil(&prevTime, 100 / portTICK_PERIOD_MS);
