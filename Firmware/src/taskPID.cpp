@@ -1,8 +1,15 @@
 #include <Arduino.h>
 #include <ArduinoLog.h>
 #include <Arduino_FreeRTOS.h>
+#include <PID_v1.h>
 
 #include "config.h"
+
+enum PIDMode
+{
+    ABSOLUTE_MODE,
+    VELOCITY_MODE,
+};
 
 /**
  * @brief INA based PID motor controller.
@@ -23,39 +30,50 @@ void TaskPID(void *pvParameters)
     pinMode(config->_bPin, OUTPUT);
     pinMode(config->_pwmPin, OUTPUT);
 
-    // Init/test
-    /** psudo: while i < maxImpulse (where max impulse is the maximum test impulse)
-     *
-     */
+    // Mode
+    PIDMode curMode = ABSOLUTE_MODE;
 
-    int targetSpeed = 150; // We want to target a specific RPM TODO: DELETE ME!
+    // Construct a simple PID controller
+    double curSpeed; // Curspeed is our input value
+    double setPoint; // The target speed
+    double setSpeed; // The output speed
+    PID localPID(&curSpeed, &setSpeed, &setPoint, config->_p, config->_i, config->_d, DIRECT);
 
-    long int curSpeed = 0;  // The current RPS
-    long int lastSpeed = 0; // The last speed (used for calculating D)
-    long int lastPulse = 0;
+    setPoint = 300; // We want to target a specific RPM TODO: DELETE ME!
 
-    int setSpeed = 0; // The current setpoint
+    long int lastPulse; // The last encoder pulse
+
+    // Enable PID
+    localPID.SetMode(AUTOMATIC);
 
     for (;;) // Run forever
     {
-        // Test motor writing
+        if (curMode == VELOCITY_MODE)
+        {
+            // Update the current speed
+            curSpeed = *config->encPtr - lastPulse;
+        }
+        else
+        {
+            // Cur "speed" is just the current setpoint
+            curSpeed = *config->encPtr;
+        }
+
+        // Compute PID
+        localPID.Compute();
+
+        // Update the motor outputs
         analogWrite(config->_pwmPin, setSpeed);                     // PWM out
         digitalWrite(config->_aPin, config->inverted ? HIGH : LOW); // Direction setting
         digitalWrite(config->_bPin, config->inverted ? LOW : HIGH);
 
-        curSpeed = (*config->encPtr - lastPulse) * 10; // (the 10 is because this loop resumes every 100ms, it could be run faster!)
+        Log.infoln("%s: Current speed is %D, output is %D", pcTaskGetName(NULL), curSpeed, setSpeed);
 
-        Log.infoln("%s: Current speed is %l, output is %d", pcTaskGetName(NULL), curSpeed, setSpeed);
+        if (curMode == VELOCITY_MODE)
+        {
+            lastPulse = *config->encPtr; // Reset the encoder absolute
+        }
 
-        // Compute PID response
-        long int _err = curSpeed - targetSpeed; // The magnitude of the error
-        // setSpeed += _err * config->_i;                     // I grows slowly over time in the magnitude of the err
-        setSpeed = _err * config->_p; // The p response
-        // setSpeed -= ((setSpeed - lastSpeed) * config->_d); // d clamps the response based on last response
-
-        lastPulse = *config->encPtr; // Reset the encoder absolute
-        lastSpeed = curSpeed;        // Update last speed
-
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        vTaskDelay(40 / portTICK_PERIOD_MS); // Return in 40 ticks
     }
 }
