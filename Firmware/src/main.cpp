@@ -110,6 +110,13 @@ void TaskLED(void *pvParameters)
         starSetpoint += 500;
         portSetpoint += 500;
 
+        /**
+         * == NEW PLAN FOR NEXT TIME ==
+         *
+         * Use an arc, use velocity pid mode too. Sweep a nice smooth arc to the finish and stop when the
+         * odometry says we've traveled for one half a circle!
+         */
+
         rgb.setPixelColor(0, 1 * maxBrigh, 0, 0);
         rgb.show();
 
