@@ -33,6 +33,9 @@ void TaskPID(void *pvParameters)
     // Mode
     PIDMode curMode = ABSOLUTE_MODE;
 
+    // Constants (delete me later)
+    const uint8_t maxAccel = 170;
+
     // Construct a simple PID controller
     double curSpeed; // Curspeed is our input value
     double setSpeed; // The output speed
@@ -60,11 +63,11 @@ void TaskPID(void *pvParameters)
         localPID.Compute();
 
         // Update the motor outputs
-        analogWrite(config->_pwmPin, setSpeed);                     // PWM out
-        digitalWrite(config->_aPin, config->inverted ? HIGH : LOW); // Direction setting
+        analogWrite(config->_pwmPin, setSpeed > maxAccel ? maxAccel : setSpeed); // PWM out
+        digitalWrite(config->_aPin, config->inverted ? HIGH : LOW);              // Direction setting
         digitalWrite(config->_bPin, config->inverted ? LOW : HIGH);
 
-        Log.infoln("%s: Current speed is %D, output is %D", pcTaskGetName(NULL), curSpeed, setSpeed);
+        // Log.infoln("%s: Current speed is %D, output is %D", pcTaskGetName(NULL), curSpeed, setSpeed);
 
         if (curMode == VELOCITY_MODE)
         {

@@ -9,23 +9,25 @@
 #include <Arduino.h>
 #include <ArduinoLog.h>
 #include <Arduino_FreeRTOS.h>
-#include <Adafruit_NeoPixel.h>
 
 // Headers
 #include "boardPins.h"
 #include "color.h"
 #include "config.h"
 #include "encoder.h"
+#include "colors.h"
 
 // Task Handlers
 TaskHandle_t TaskLEDs_Handler;
 TaskHandle_t TaskStarPID_Handler;
 TaskHandle_t TaskPortPID_Handler;
-Adafruit_NeoPixel rgb(1, NEO_PIN, NEO_GRB + NEO_KHZ800);
 
 // Prototypes
 void TaskLED(void *pvParameters);
 void TaskPID(void *pvParameters); // The nice thing about these task prototypes is we can redefine new ones using new pvparams!
+
+// Buttons
+Bounce2::Button userButton1 = Bounce2::Button();
 
 // Controls
 const long int eventsTo90 = 600;
@@ -43,6 +45,9 @@ void setup()
     // Pins
     pinMode(LED_BUILTIN, OUTPUT);
 
+    // Buttons
+    userButton1.attach(UB1_PIN, INPUT_PULLUP);
+
     // Setup regular tasks
     xTaskCreate(
         TaskLED,            // A pointer to this task in memory
@@ -59,8 +64,8 @@ void setup()
     attachInterrupt(digitalPinToInterrupt(PORT_ENC), isrHandlerPort, FALLING);
 
     // Setup PID Configs
-    static PIDConfig starPIDConfig = {true, 2.0, 1.0, 0.9, INA1A, INA2A, MotorPWM_A, &starPulse, &starSetpoint};
-    static PIDConfig portPIDConfig = {false, 2.0, 1.0, 0.9, INA1B, INA2B, MotorPWM_B, &portPulse, &portSetpoint};
+    static PIDConfig starPIDConfig = {true, 1.8, 1.0, 0.9, INA1A, INA2A, MotorPWM_A, &starPulse, &starSetpoint};
+    static PIDConfig portPIDConfig = {false, 1.8, 1.0, 0.9, INA1B, INA2B, MotorPWM_B, &portPulse, &portSetpoint};
 
     // Spawn the same task template twice, putting two copies in memory
     xTaskCreate(
@@ -91,14 +96,10 @@ void TaskLED(void *pvParameters)
 
     // We are required to run this inital task for 4 seconds.
     Log.infoln("%s: Beginning bootup sequence.", pcTaskGetName(NULL)); // Log we're booting up
-    xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);             // Sleep for 1 sec
-    rgb.setPixelColor(0, 1 * maxBrigh, 0, 0);                          // Set Red
-    rgb.show();                                                        // Push
-    xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);             // Sleep for 1 sec
-    rgb.setPixelColor(0, 0, 1 * maxBrigh, 0);                          // Green
-    rgb.show();                                                        // Push
-    xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);             // Sleep for 1 sec
-    Log.infoln("%s: Bootup done", pcTaskGetName(NULL));                // Done
+    setRed();
+    xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS); // Sleep for 1 sec
+    Log.infoln("%s: Bootup done", pcTaskGetName(NULL));    // Done
+    setGreen();
 
     // Pause for a bit
     xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);
@@ -106,10 +107,6 @@ void TaskLED(void *pvParameters)
     // Task will never return from here
     for (;;)
     {
-        // Setpoints
-        starSetpoint += 500;
-        portSetpoint += 500;
-
         /**
          * == NEW PLAN FOR NEXT TIME ==
          *
@@ -117,20 +114,48 @@ void TaskLED(void *pvParameters)
          * odometry says we've traveled for one half a circle!
          */
 
-        rgb.setPixelColor(0, 1 * maxBrigh, 0, 0);
-        rgb.show();
+        // Check if run button pressed
+        if (userButton1.pressed())
+        {
+            Log.infoln(F("%s: User button pressed, ready to go"), pcTaskGetName(NULL));
 
-        xTaskDelayUntil(&prevTime, 2000 / portTICK_PERIOD_MS);
+            setRed();
 
-        starSetpoint += eventsTo90;
+            /**
+             * Sequence start
+             */
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
 
-        rgb.setPixelColor(0, 0, 1 * maxBrigh, 0);
-        rgb.show();
+            portSetpoint += 120;
+            Log.infoln(F("%s: Advance star by 200"), pcTaskGetName(NULL));
+            vTaskDelay(1500 / portTICK_PERIOD_MS);
 
-        xTaskDelayUntil(&prevTime, 1500 / portTICK_PERIOD_MS);
+            starSetpoint += 450;
+            portSetpoint += 540;
+            Log.infoln(F("%s: Forward"), pcTaskGetName(NULL));
+            vTaskDelay(1500 / portTICK_PERIOD_MS);
 
-        // Go to sleep (await cleanup)
-        xTaskDelayUntil(&prevTime, 100 / portTICK_PERIOD_MS);
+            portSetpoint += 320;
+            Log.infoln(F("%s: Left"), pcTaskGetName(NULL));
+            vTaskDelay(900 / portTICK_PERIOD_MS);
+
+            starSetpoint += 650;
+            portSetpoint += 660;
+            Log.infoln(F("%s: Forward"), pcTaskGetName(NULL));
+            vTaskDelay(2500 / portTICK_PERIOD_MS);
+
+            starSetpoint += 120;
+            Log.infoln(F("%s: Turn back"), pcTaskGetName(NULL));
+            vTaskDelay(1500 / portTICK_PERIOD_MS);
+
+            vTaskDelay(1500 / portTICK_PERIOD_MS);
+
+            Log.infoln(F("%s: Done"), pcTaskGetName(NULL));
+            setGreen(); // Done!
+        }
+
+        // Update all buttons
+        userButton1.update();
     }
 }
 

@@ -9,6 +9,7 @@ volatile long int portPulse = 0;
 
 void isrHandlerPort()
 {
+    // There is no way to reverse! Single phase encoders ONLY count up!
     portPulse += 1;
 }
 

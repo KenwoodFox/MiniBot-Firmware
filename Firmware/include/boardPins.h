@@ -15,6 +15,10 @@
 #define INA1B 30
 #define INA2B 36
 
+// Buttons
+#define UB1_PIN 6 // As defined by Prof
+#define UB2_PIN 7
+
 // Encoders
 #define STAR_ENC 2
 #define PORT_ENC 3
