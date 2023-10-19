@@ -20,7 +20,7 @@
 #define UB2_PIN 7
 
 // Encoders
-#define STAR_ENC 2
-#define PORT_ENC 3
+#define STAR_ENC 3
+#define PORT_ENC 2
 
 #endif

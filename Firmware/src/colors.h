@@ -11,6 +11,12 @@ void setGreen()
     rgb.show();                               // Push
 }
 
+void setBlue()
+{
+    rgb.setPixelColor(0, 0, 0, 1 * maxBrigh); // Blue
+    rgb.show();                               // Push
+}
+
 void setRed()
 {
     rgb.setPixelColor(0, 1 * maxBrigh, 0, 0); // Red

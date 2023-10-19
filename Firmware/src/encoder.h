@@ -5,6 +5,7 @@
  */
 
 volatile long int starPulse = 0;
+volatile long int starAccum = 0;
 volatile long int portPulse = 0;
 
 void isrHandlerPort()
@@ -16,4 +17,5 @@ void isrHandlerPort()
 void isrHandlerStar()
 {
     starPulse += 1;
+    starAccum++;
 }

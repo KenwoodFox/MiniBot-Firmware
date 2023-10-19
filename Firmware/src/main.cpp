@@ -64,8 +64,8 @@ void setup()
     attachInterrupt(digitalPinToInterrupt(PORT_ENC), isrHandlerPort, FALLING);
 
     // Setup PID Configs
-    static PIDConfig starPIDConfig = {true, 1.8, 1.0, 0.9, INA1A, INA2A, MotorPWM_A, &starPulse, &starSetpoint};
-    static PIDConfig portPIDConfig = {false, 1.8, 1.0, 0.9, INA1B, INA2B, MotorPWM_B, &portPulse, &portSetpoint};
+    static PIDConfig starPIDConfig = {false, 18.0, 5.0, 0.9, INA1B, INA2B, MotorPWM_B, &starPulse, &starSetpoint};
+    static PIDConfig portPIDConfig = {true, 18.0, 5.0, 0.9, INA1A, INA2A, MotorPWM_A, &portPulse, &portSetpoint};
 
     // Spawn the same task template twice, putting two copies in memory
     xTaskCreate(
@@ -119,6 +119,9 @@ void TaskLED(void *pvParameters)
         {
             Log.infoln(F("%s: User button pressed, ready to go"), pcTaskGetName(NULL));
 
+            // Init
+            starAccum = 0;
+
             setRed();
 
             /**
@@ -126,30 +129,48 @@ void TaskLED(void *pvParameters)
              */
             vTaskDelay(1000 / portTICK_PERIOD_MS);
 
-            portSetpoint += 120;
-            Log.infoln(F("%s: Advance star by 200"), pcTaskGetName(NULL));
-            vTaskDelay(1500 / portTICK_PERIOD_MS);
+            starSetpoint = 4;
+            Log.infoln(F("%s: Right"), pcTaskGetName(NULL));
+            while (starAccum < 55)
+            {
+                vTaskDelay(4);
+                setBlue();
+                Log.infoln(F("%s: Wait for %l"), pcTaskGetName(NULL), starAccum);
+            }
+            setRed();
 
-            starSetpoint += 450;
-            portSetpoint += 540;
+            starSetpoint = 9;
+            portSetpoint = 9;
             Log.infoln(F("%s: Forward"), pcTaskGetName(NULL));
-            vTaskDelay(1500 / portTICK_PERIOD_MS);
+            vTaskDelay(800 / portTICK_PERIOD_MS);
 
-            portSetpoint += 320;
+            starSetpoint = 12;
+            portSetpoint = 12;
+            Log.infoln(F("%s: Forward (fast)"), pcTaskGetName(NULL));
+            vTaskDelay(1400 / portTICK_PERIOD_MS);
+
+            setBlue();
+            starSetpoint = 4;
+            portSetpoint = 11;
             Log.infoln(F("%s: Left"), pcTaskGetName(NULL));
-            vTaskDelay(900 / portTICK_PERIOD_MS);
+            vTaskDelay(800 / portTICK_PERIOD_MS);
+            setRed();
 
-            starSetpoint += 650;
-            portSetpoint += 660;
+            starSetpoint = 15;
+            portSetpoint = 15;
             Log.infoln(F("%s: Forward"), pcTaskGetName(NULL));
-            vTaskDelay(2500 / portTICK_PERIOD_MS);
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
 
-            starSetpoint += 120;
-            Log.infoln(F("%s: Turn back"), pcTaskGetName(NULL));
+            starSetpoint = 6;
+            portSetpoint = 3;
+            Log.infoln(F("%s: Right"), pcTaskGetName(NULL));
+            vTaskDelay(700 / portTICK_PERIOD_MS);
+
+            // Stop
+            starSetpoint = 0;
+            portSetpoint = 0;
+
             vTaskDelay(1500 / portTICK_PERIOD_MS);
-
-            vTaskDelay(1500 / portTICK_PERIOD_MS);
-
             Log.infoln(F("%s: Done"), pcTaskGetName(NULL));
             setGreen(); // Done!
         }
