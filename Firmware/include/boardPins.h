@@ -20,7 +20,20 @@
 #define UB2_PIN 7
 
 // Encoders
-#define STAR_ENC 3
 #define PORT_ENC 2
+#define STAR_ENC 3
+
+// Ultrasonic
+#define ECHO_PIN 31
+#define TRIG_PIN 33
+
+// Servos
+#define SERVO1_PIN 51
+
+// Steppers
+#define STEPA_1 41
+#define STEPA_2 43
+#define STEPA_3 45
+#define STEPA_4 47
 
 #endif
