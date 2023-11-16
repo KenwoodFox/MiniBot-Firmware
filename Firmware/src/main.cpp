@@ -9,6 +9,7 @@
 #include <Arduino.h>
 #include <ArduinoLog.h>
 #include <Arduino_FreeRTOS.h>
+#include <Servo.h>
 
 // Headers
 #include "boardPins.h"
@@ -38,6 +39,7 @@ double portSetpoint = 0.0;
 // we'll use 128 8 bit bytes (to start,
 // we could replace this with something more efficent!)
 uint8_t occupationMap[128];
+Servo sonarServo;
 
 void setup()
 {
@@ -55,6 +57,10 @@ void setup()
 
     // Bluetooth Radio modem
     Serial1.begin(38400); // We can use one of the hardware serial devices.
+
+    // Sonar system
+    sonarServo.attach(SERVO1_PIN); // Pin 51 on board
+    /* TOF reflector sensor here */
 
     // Setup regular tasks
     xTaskCreate(
@@ -118,13 +124,28 @@ void TaskLED(void *pvParameters)
         // Check if run button pressed
         if (userButton1.pressed())
         {
-            Log.infoln(F("%s: User button pressed, ready to go"), pcTaskGetName(NULL));
+            Log.infoln("%s: User button pressed, ready to go", pcTaskGetName(NULL));
             setRed();
 
-            /**
-             * Sequence start
-             */
+            // Configure/initialize servo
+            if (!sonarServo.attached())
+            {
+                sonarServo.attach(SERVO1_PIN);
+            }
+            sonarServo.write(255 / 2);
+
+            // Ready
             vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+            // Perform quick scan
+            for (size_t i = 0; i < 128; i++)
+            {
+                setBlue();
+                sonarServo.write(i * 2);
+                vTaskDelay(100 / portTICK_PERIOD_MS);
+                setRed();
+                vTaskDelay(200 / portTICK_PERIOD_MS);
+            }
 
             /**
              * SONAR LOGIC CODE HERE
@@ -132,9 +153,10 @@ void TaskLED(void *pvParameters)
              * SONAR LOGIC CODE HERE
              */
 
-            // // Stop
-            // starSetpoint = 0;
-            // portSetpoint = 0;
+            // Done
+            Log.infoln("%s: Done.", pcTaskGetName(NULL));
+            setGreen();
+            sonarServo.detach();
         }
 
         // Update all buttons
