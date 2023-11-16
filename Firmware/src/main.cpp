@@ -115,21 +115,10 @@ void TaskLED(void *pvParameters)
     // Task will never return from here
     for (;;)
     {
-        /**
-         * == NEW PLAN FOR NEXT TIME ==
-         *
-         * Use an arc, use velocity pid mode too. Sweep a nice smooth arc to the finish and stop when the
-         * odometry says we've traveled for one half a circle!
-         */
-
         // Check if run button pressed
         if (userButton1.pressed())
         {
             Log.infoln(F("%s: User button pressed, ready to go"), pcTaskGetName(NULL));
-
-            // Init
-            starAccum = 0;
-
             setRed();
 
             /**
@@ -137,50 +126,15 @@ void TaskLED(void *pvParameters)
              */
             vTaskDelay(1000 / portTICK_PERIOD_MS);
 
-            starSetpoint = 4;
-            Log.infoln(F("%s: Right"), pcTaskGetName(NULL));
-            while (starAccum < 55)
-            {
-                vTaskDelay(4);
-                setBlue();
-                Log.infoln(F("%s: Wait for %l"), pcTaskGetName(NULL), starAccum);
-            }
-            setRed();
+            /**
+             * SONAR LOGIC CODE HERE
+             *
+             * SONAR LOGIC CODE HERE
+             */
 
-            starSetpoint = 9;
-            portSetpoint = 9;
-            Log.infoln(F("%s: Forward"), pcTaskGetName(NULL));
-            vTaskDelay(800 / portTICK_PERIOD_MS);
-
-            starSetpoint = 12;
-            portSetpoint = 12;
-            Log.infoln(F("%s: Forward (fast)"), pcTaskGetName(NULL));
-            vTaskDelay(1400 / portTICK_PERIOD_MS);
-
-            setBlue();
-            starSetpoint = 4;
-            portSetpoint = 11;
-            Log.infoln(F("%s: Left"), pcTaskGetName(NULL));
-            vTaskDelay(800 / portTICK_PERIOD_MS);
-            setRed();
-
-            starSetpoint = 15;
-            portSetpoint = 15;
-            Log.infoln(F("%s: Forward"), pcTaskGetName(NULL));
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-
-            starSetpoint = 6;
-            portSetpoint = 3;
-            Log.infoln(F("%s: Right"), pcTaskGetName(NULL));
-            vTaskDelay(700 / portTICK_PERIOD_MS);
-
-            // Stop
-            starSetpoint = 0;
-            portSetpoint = 0;
-
-            vTaskDelay(1500 / portTICK_PERIOD_MS);
-            Log.infoln(F("%s: Done"), pcTaskGetName(NULL));
-            setGreen(); // Done!
+            // // Stop
+            // starSetpoint = 0;
+            // portSetpoint = 0;
         }
 
         // Update all buttons
