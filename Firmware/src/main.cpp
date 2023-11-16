@@ -34,6 +34,11 @@ const long int eventsTo90 = 600;
 double starSetpoint = 0.0;
 double portSetpoint = 0.0;
 
+// Guo wants us to create a field-map,
+// we'll use 128 8 bit bytes (to start,
+// we could replace this with something more efficent!)
+uint8_t occupationMap[128];
+
 void setup()
 {
     // Setup serial
@@ -47,6 +52,9 @@ void setup()
 
     // Buttons
     userButton1.attach(UB1_PIN, INPUT_PULLUP);
+
+    // Bluetooth Radio modem
+    Serial1.begin(38400); // We can use one of the hardware serial devices.
 
     // Setup regular tasks
     xTaskCreate(
