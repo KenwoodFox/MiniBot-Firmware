@@ -10,6 +10,7 @@
 #include <ArduinoLog.h>
 #include <Arduino_FreeRTOS.h>
 #include <Servo.h>
+#include <HCSR04.h>
 
 // Headers
 #include "boardPins.h"
@@ -19,16 +20,19 @@
 #include "colors.h"
 
 // Task Handlers
-TaskHandle_t TaskLEDs_Handler;
+TaskHandle_t TaskNav_Handler;
 TaskHandle_t TaskStarPID_Handler;
 TaskHandle_t TaskPortPID_Handler;
 
 // Prototypes
-void TaskLED(void *pvParameters);
+void TaskNavigate(void *pvParameters);
 void TaskPID(void *pvParameters); // The nice thing about these task prototypes is we can redefine new ones using new pvparams!
 
 // Buttons
 Bounce2::Button userButton1 = Bounce2::Button();
+
+// Sensors
+HCSR04 sonar(TRIG_PIN, ECHO_PIN);
 
 // Controls
 const long int eventsTo90 = 600;
@@ -38,7 +42,7 @@ double portSetpoint = 0.0;
 // Guo wants us to create a field-map,
 // we'll use 128 8 bit bytes (to start,
 // we could replace this with something more efficent!)
-uint8_t occupationMap[128];
+float occupationMap[128];
 Servo sonarServo;
 
 void setup()
@@ -64,12 +68,12 @@ void setup()
 
     // Setup regular tasks
     xTaskCreate(
-        TaskLED,            // A pointer to this task in memory
-        "LEDs",             // A name just for humans
-        128,                // This stack size can be checked & adjusted by reading the Stack Highwater
-        NULL,               // Parameters passed to the task function
-        2,                  // Priority, with 2 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
-        &TaskLEDs_Handler); // Task handle
+        TaskNavigate,      // A pointer to this task in memory
+        "NAV",             // A name just for humans
+        128,               // This stack size can be checked & adjusted by reading the Stack Highwater
+        NULL,              // Parameters passed to the task function
+        2,                 // Priority, with 2 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
+        &TaskNav_Handler); // Task handle
 
     // Configure hardware inturrupts
     pinMode(STAR_ENC, INPUT_PULLUP);
@@ -99,7 +103,7 @@ void setup()
         &TaskPortPID_Handler);
 }
 
-void TaskLED(void *pvParameters)
+void TaskNavigate(void *pvParameters)
 {
     (void)pvParameters;
     // Setup here
@@ -132,20 +136,36 @@ void TaskLED(void *pvParameters)
             {
                 sonarServo.attach(SERVO1_PIN);
             }
-            sonarServo.write(255 / 2);
+            sonarServo.write(0);
 
             // Ready
             vTaskDelay(1000 / portTICK_PERIOD_MS);
 
             // Perform quick scan
-            for (size_t i = 0; i < 128; i++)
+            for (size_t i = 0; i < 128; i += SONAR_STEP_SIZE)
             {
-                setBlue();
-                sonarServo.write(i * 2);
-                vTaskDelay(100 / portTICK_PERIOD_MS);
-                setRed();
-                vTaskDelay(200 / portTICK_PERIOD_MS);
+                setBlue();                                             // Set LED to blue
+                sonarServo.write(i * 2);                               // Begin moving
+                vTaskDelay(150 / portTICK_PERIOD_MS);                  // Wait for movement to finish
+                occupationMap[i] = sonar.dist();                       // Record the distance
+                Log.infoln("Distance at %d: %F", i, occupationMap[i]); // Log the distance recorded
+                setRed();                                              // Set the LED to red
             }
+
+            Log.infoln("Computing occupation map...");
+
+            uint8_t _centroid = 0;
+
+            // Iterate the map
+            for (size_t i = 0; i < 128; i += SONAR_STEP_SIZE)
+            {
+                if (occupationMap[i] < occupationMap[_centroid])
+                {
+                    _centroid = i;
+                }
+            }
+
+            Log.infoln("Centroid of map occupation is at %d", _centroid);
 
             /**
              * SONAR LOGIC CODE HERE
@@ -154,9 +174,10 @@ void TaskLED(void *pvParameters)
              */
 
             // Done
-            Log.infoln("%s: Done.", pcTaskGetName(NULL));
-            setGreen();
-            sonarServo.detach();
+            sonarServo.write(255 / 2);                    // Return to center
+            Log.infoln("%s: Done.", pcTaskGetName(NULL)); // Log completion
+            setGreen();                                   // Set LED to green
+            sonarServo.detach();                          // Detach (free timer2 for PWM)
         }
 
         // Update all buttons

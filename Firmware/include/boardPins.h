@@ -24,8 +24,8 @@
 #define STAR_ENC 3
 
 // Ultrasonic
-#define ECHO_PIN 31
-#define TRIG_PIN 33
+#define ECHO_PIN 11
+#define TRIG_PIN 12
 
 // Servos
 #define SERVO1_PIN 51
