@@ -23,9 +23,11 @@
 TaskHandle_t TaskNav_Handler;
 TaskHandle_t TaskStarPID_Handler;
 TaskHandle_t TaskPortPID_Handler;
+TaskHandle_t TaskModem_Handler;
 
 // Prototypes
 void TaskNavigate(void *pvParameters);
+void TaskModem(void *pvParameters);
 void TaskPID(void *pvParameters); // The nice thing about these task prototypes is we can redefine new ones using new pvparams!
 
 // Buttons
@@ -42,7 +44,8 @@ double portSetpoint = 0.0;
 // Guo wants us to create a field-map,
 // we'll use 128 8 bit bytes (to start,
 // we could replace this with something more efficent!)
-float occupationMap[128];
+const uint8_t occupationMapDensity = 40;
+float occupationMap[occupationMapDensity];
 Servo sonarServo;
 
 void setup()
@@ -52,6 +55,9 @@ void setup()
     Serial.print("\n\n");
     Log.begin(LOG_LEVEL_VERBOSE, &Serial);
     Log.infoln("Init: Beginning user code! Version %s", REVISION);
+
+    // Setup comms
+    Serial1.begin(38400); // Bluetooth module
 
     // Pins
     pinMode(LED_BUILTIN, OUTPUT);
@@ -70,10 +76,18 @@ void setup()
     xTaskCreate(
         TaskNavigate,      // A pointer to this task in memory
         "NAV",             // A name just for humans
-        128,               // This stack size can be checked & adjusted by reading the Stack Highwater
+        200,               // This stack size can be checked & adjusted by reading the Stack Highwater
         NULL,              // Parameters passed to the task function
         2,                 // Priority, with 2 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
         &TaskNav_Handler); // Task handle
+
+    xTaskCreate(
+        TaskModem,
+        "Modem",
+        160,
+        NULL,
+        2,
+        &TaskModem_Handler);
 
     // Configure hardware inturrupts
     pinMode(STAR_ENC, INPUT_PULLUP);
@@ -103,6 +117,48 @@ void setup()
         &TaskPortPID_Handler);
 }
 
+void TaskModem(void *pvParameters)
+{
+    (void)pvParameters;
+
+    // Prev time
+    TickType_t prevTime;
+
+    char buf[30]; // Message buffer
+
+    // Wait
+    xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS); // Sleep for 1 sec
+
+    // Check if AT mode
+    // Try enter AT mode
+    Serial1.print("AT\n\r");                             // Send AT
+    xTaskDelayUntil(&prevTime, 60 / portTICK_PERIOD_MS); // Sleep for 60ms
+    Serial1.readBytes(buf, 4);
+    if (strcmp(buf, "OK\n\r"))
+    {
+        Log.warningln("Modem is in AT mode! Uploading config...");
+        Serial1.print("AT+NAME=Group7_SamJoe\n\r");
+        Serial1.print("AT+PIN=1234\n\r");
+    }
+
+    // Done
+    Log.infoln("%s: Ready", pcTaskGetName(NULL));
+
+    for (;;)
+    {
+        // Start by checking the buf
+        if (Serial1.available() > 0)
+        {
+            Serial.println(Serial1.read());
+        }
+
+        while (Serial.available() > 0)
+        {
+            Serial1.print(Serial.read());
+        }
+    }
+}
+
 void TaskNavigate(void *pvParameters)
 {
     (void)pvParameters;
@@ -121,6 +177,11 @@ void TaskNavigate(void *pvParameters)
 
     // Pause for a bit
     xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);
+
+    // Memory
+    uint8_t lastSweep = 0;      // Used to keep track of last sweep pos
+    uint8_t sweepUp = true;     // If we're sweeping up
+    occupationMap[0] = 9999.99; // Prepopulate
 
     // Task will never return from here
     for (;;)
@@ -141,43 +202,67 @@ void TaskNavigate(void *pvParameters)
             // Ready
             vTaskDelay(1000 / portTICK_PERIOD_MS);
 
-            // Perform quick scan
-            for (size_t i = 0; i < 128; i += SONAR_STEP_SIZE)
+            // Process
+            while (true)
             {
-                setBlue();                                             // Set LED to blue
-                sonarServo.write(i * 2);                               // Begin moving
-                vTaskDelay(150 / portTICK_PERIOD_MS);                  // Wait for movement to finish
-                occupationMap[i] = sonar.dist();                       // Record the distance
-                Log.infoln("Distance at %d: %F", i, occupationMap[i]); // Log the distance recorded
-                setRed();                                              // Set the LED to red
-            }
-
-            Log.infoln("Computing occupation map...");
-
-            uint8_t _centroid = 0;
-
-            // Iterate the map
-            for (size_t i = 0; i < 128; i += SONAR_STEP_SIZE)
-            {
-                if (occupationMap[i] < occupationMap[_centroid])
+                // Sweep control
+                if (sweepUp)
                 {
-                    _centroid = i;
+                    // We're sweeping up
+                    lastSweep += 1;
+                    if (lastSweep >= occupationMapDensity)
+                    {
+                        lastSweep -= 2;  // Go back one space
+                        sweepUp = false; // Go back down!
+                    }
                 }
+                else
+                {
+                    lastSweep -= 1;
+                    if (lastSweep == 0)
+                    {
+                        sweepUp = true; // Go back up!
+                    }
+                }
+
+                // Perform quick scan
+                setBlue();                                                             // Set LED to blue
+                sonarServo.write(lastSweep * (180.0 / occupationMapDensity));          // Begin moving
+                vTaskDelay(110 / portTICK_PERIOD_MS);                                  // Wait for movement to finish
+                occupationMap[lastSweep] = sonar.dist();                               // Record the distance
+                Log.infoln("Distance at %d: %F", lastSweep, occupationMap[lastSweep]); // Log the distance recorded
+                setRed();                                                              // Set the LED to red
+
+                /**
+                 * Compute the occupation map
+                 */
+                uint8_t _centroid = 0;
+
+                // Iterate the map
+                for (size_t i = 0; i < occupationMapDensity; i++)
+                {
+                    if (occupationMap[i] < occupationMap[_centroid] && occupationMap[i] != 0)
+                    {
+                        _centroid = i;
+                    }
+                }
+
+                Log.infoln("Centroid of map occupation is at %d, distance %F", _centroid, occupationMap[_centroid]);
+
+                /**
+                 * SONAR LOGIC CODE HERE
+                 *
+                 * SONAR LOGIC CODE HERE
+                 */
+
+                // Detach (free timer2 for PWM)
             }
-
-            Log.infoln("Centroid of map occupation is at %d", _centroid);
-
-            /**
-             * SONAR LOGIC CODE HERE
-             *
-             * SONAR LOGIC CODE HERE
-             */
 
             // Done
             sonarServo.write(255 / 2);                    // Return to center
             Log.infoln("%s: Done.", pcTaskGetName(NULL)); // Log completion
             setGreen();                                   // Set LED to green
-            sonarServo.detach();                          // Detach (free timer2 for PWM)
+            sonarServo.detach();
         }
 
         // Update all buttons
