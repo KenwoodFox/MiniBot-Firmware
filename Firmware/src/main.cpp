@@ -47,6 +47,7 @@ double portSetpoint = 0.0;
 const uint8_t occupationMapDensity = 40;
 float occupationMap[occupationMapDensity];
 Servo sonarServo;
+bool occupationNotReady = true;
 
 void setup()
 {
@@ -192,6 +193,13 @@ void TaskNavigate(void *pvParameters)
             Log.infoln("%s: User button pressed, ready to go", pcTaskGetName(NULL));
             setRed();
 
+            // Inital just kinda scoot foward
+            starSetpoint = 5;
+            portSetpoint = 5;
+            vTaskDelay(2000 / portTICK_PERIOD_MS);
+            starSetpoint = 0;
+            portSetpoint = 0;
+
             // Configure/initialize servo
             if (!sonarServo.attached())
             {
@@ -203,7 +211,7 @@ void TaskNavigate(void *pvParameters)
             vTaskDelay(1000 / portTICK_PERIOD_MS);
 
             // Process
-            while (true)
+            while (occupationNotReady)
             {
                 // Sweep control
                 if (sweepUp)
@@ -249,20 +257,30 @@ void TaskNavigate(void *pvParameters)
 
                 Log.infoln("Centroid of map occupation is at %d, distance %F", _centroid, occupationMap[_centroid]);
 
-                /**
-                 * SONAR LOGIC CODE HERE
-                 *
-                 * SONAR LOGIC CODE HERE
-                 */
+                if (occupationMap[occupationMapDensity - 1] != 0)
+                {
+                    occupationNotReady = false; // This bool lets the loop know we're ready.
+                }
 
                 // Detach (free timer2 for PWM)
             }
 
             // Done
-            sonarServo.write(255 / 2);                    // Return to center
-            Log.infoln("%s: Done.", pcTaskGetName(NULL)); // Log completion
-            setGreen();                                   // Set LED to green
+            sonarServo.write(255 / 2);                             // Return to center
+            Log.infoln("%s: Done scanning.", pcTaskGetName(NULL)); // Log completion
+            setGreen();                                            // Set LED to green
             sonarServo.detach();
+
+            // Do some driving!
+            starSetpoint = 9;
+            portSetpoint = 4;
+            vTaskDelay(800 / portTICK_PERIOD_MS);
+            starSetpoint = 9;
+            portSetpoint = 9;
+            vTaskDelay(3000 / portTICK_PERIOD_MS);
+            starSetpoint = 0;
+            portSetpoint = 0;
+            Log.infoln("%s: Done moving.", pcTaskGetName(NULL));
         }
 
         // Update all buttons
