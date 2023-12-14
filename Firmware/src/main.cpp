@@ -49,6 +49,24 @@ float occupationMap[occupationMapDensity];
 Servo sonarServo;
 bool occupationNotReady = true;
 
+/**
+ * @brief Get the line error
+ *
+ * Im just throwing this here for now,
+ *
+ * @return int Error from 0 to 1024, -1 means not on a line
+ */
+int getError()
+{
+    Log.infoln("%d %d %d", analogRead(LEFT_LINEFOLLOWER), analogRead(CNTR_LINEFOLLOWER), analogRead(RIGH_LINEFOLLOWER));
+
+    int _baseLine = analogRead(CNTR_LINEFOLLOWER);
+    int _l = analogRead(LEFT_LINEFOLLOWER);
+    int _r = analogRead(RIGH_LINEFOLLOWER);
+
+    return _l - _r;
+}
+
 void setup()
 {
     // Setup serial
@@ -169,6 +187,11 @@ void TaskNavigate(void *pvParameters)
     // Prev time
     TickType_t prevTime;
 
+    // Configure pins
+    // pinMode(LEFT_LINEFOLLOWER, INPUT);
+    // pinMode(CNTR_LINEFOLLOWER, INPUT);
+    // pinMode(RIGH_LINEFOLLOWER, INPUT);
+
     // We are required to run this inital task for 4 seconds.
     Log.infoln("%s: Beginning bootup sequence.", pcTaskGetName(NULL)); // Log we're booting up
     setRed();
@@ -187,8 +210,45 @@ void TaskNavigate(void *pvParameters)
     // Task will never return from here
     for (;;)
     {
-        // Check if run button pressed
-        if (userButton1.pressed())
+
+        /**
+         * This section can use either the short (if _err) method
+         * or the long method from the OTHER BRANCH @sam
+         */
+        if (userButton1.pressed()) // Begin regular line following nav from here
+        {
+            while (true)
+            {
+                int _err = getError();
+                Log.infoln("Computed error %d", _err);
+
+                if (_err > 20)
+                {
+                    // turn left
+                    starSetpoint = 0;
+                    portSetpoint = 6;
+                }
+                else if (_err < 20)
+                {
+                    // turn right
+                    starSetpoint = 0;
+                    portSetpoint = 6;
+                }
+                else
+                {
+                    // straight
+                    starSetpoint = 13;
+                    portSetpoint = 13;
+                }
+            }
+        }
+
+        /**
+         * Occupancy thing from previous submission,
+         * run when we encounter object
+         */
+        // Check if run button pressed (Skipping this for now)
+        if (userButton1.pressed() && false)
         {
             Log.infoln("%s: User button pressed, ready to go", pcTaskGetName(NULL));
             setRed();

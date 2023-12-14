@@ -30,6 +30,11 @@
 // Servos
 #define SERVO1_PIN 51
 
+// Light sensors
+#define LEFT_LINEFOLLOWER 0
+#define CNTR_LINEFOLLOWER 1
+#define RIGH_LINEFOLLOWER 2
+
 // Steppers
 #define STEPA_1 41
 #define STEPA_2 43
