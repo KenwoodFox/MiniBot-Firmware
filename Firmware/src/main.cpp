@@ -9,6 +9,8 @@
 #include <Arduino.h>
 #include <ArduinoLog.h>
 #include <Arduino_FreeRTOS.h>
+#include <Servo.h>
+#include <HCSR04.h>
 
 // Headers
 #include "boardPins.h"
@@ -18,21 +20,52 @@
 #include "colors.h"
 
 // Task Handlers
-TaskHandle_t TaskLEDs_Handler;
+TaskHandle_t TaskNav_Handler;
 TaskHandle_t TaskStarPID_Handler;
 TaskHandle_t TaskPortPID_Handler;
+TaskHandle_t TaskModem_Handler;
 
 // Prototypes
-void TaskLED(void *pvParameters);
+void TaskNavigate(void *pvParameters);
+void TaskModem(void *pvParameters);
 void TaskPID(void *pvParameters); // The nice thing about these task prototypes is we can redefine new ones using new pvparams!
 
 // Buttons
 Bounce2::Button userButton1 = Bounce2::Button();
 
+// Sensors
+HCSR04 sonar(TRIG_PIN, ECHO_PIN);
+
 // Controls
 const long int eventsTo90 = 600;
 double starSetpoint = 0.0;
 double portSetpoint = 0.0;
+
+// Guo wants us to create a field-map,
+// we'll use 128 8 bit bytes (to start,
+// we could replace this with something more efficent!)
+const uint8_t occupationMapDensity = 40;
+float occupationMap[occupationMapDensity];
+Servo sonarServo;
+bool occupationNotReady = true;
+
+/**
+ * @brief Get the line error
+ *
+ * Im just throwing this here for now,
+ *
+ * @return int Error from 0 to 1024, -1 means not on a line
+ */
+int getError()
+{
+    Log.infoln("%d %d %d", analogRead(LEFT_LINEFOLLOWER), analogRead(CNTR_LINEFOLLOWER), analogRead(RIGH_LINEFOLLOWER));
+
+    int _baseLine = analogRead(CNTR_LINEFOLLOWER);
+    int _l = analogRead(LEFT_LINEFOLLOWER);
+    int _r = analogRead(RIGH_LINEFOLLOWER);
+
+    return _l - _r;
+}
 
 void setup()
 {
@@ -42,20 +75,38 @@ void setup()
     Log.begin(LOG_LEVEL_VERBOSE, &Serial);
     Log.infoln("Init: Beginning user code! Version %s", REVISION);
 
+    // Setup comms
+    Serial1.begin(38400); // Bluetooth module
+
     // Pins
     pinMode(LED_BUILTIN, OUTPUT);
 
     // Buttons
     userButton1.attach(UB1_PIN, INPUT_PULLUP);
 
+    // Bluetooth Radio modem
+    Serial1.begin(38400); // We can use one of the hardware serial devices.
+
+    // Sonar system
+    sonarServo.attach(SERVO1_PIN); // Pin 51 on board
+    /* TOF reflector sensor here */
+
     // Setup regular tasks
     xTaskCreate(
-        TaskLED,            // A pointer to this task in memory
-        "LEDs",             // A name just for humans
-        128,                // This stack size can be checked & adjusted by reading the Stack Highwater
-        NULL,               // Parameters passed to the task function
-        2,                  // Priority, with 2 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
-        &TaskLEDs_Handler); // Task handle
+        TaskNavigate,      // A pointer to this task in memory
+        "NAV",             // A name just for humans
+        200,               // This stack size can be checked & adjusted by reading the Stack Highwater
+        NULL,              // Parameters passed to the task function
+        2,                 // Priority, with 2 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
+        &TaskNav_Handler); // Task handle
+
+    xTaskCreate(
+        TaskModem,
+        "Modem",
+        160,
+        NULL,
+        2,
+        &TaskModem_Handler);
 
     // Configure hardware inturrupts
     pinMode(STAR_ENC, INPUT_PULLUP);
@@ -85,7 +136,49 @@ void setup()
         &TaskPortPID_Handler);
 }
 
-void TaskLED(void *pvParameters)
+void TaskModem(void *pvParameters)
+{
+    (void)pvParameters;
+
+    // Prev time
+    TickType_t prevTime;
+
+    char buf[30]; // Message buffer
+
+    // Wait
+    xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS); // Sleep for 1 sec
+
+    // Check if AT mode
+    // Try enter AT mode
+    Serial1.print("AT\n\r");                             // Send AT
+    xTaskDelayUntil(&prevTime, 60 / portTICK_PERIOD_MS); // Sleep for 60ms
+    Serial1.readBytes(buf, 4);
+    if (strcmp(buf, "OK\n\r"))
+    {
+        Log.warningln("Modem is in AT mode! Uploading config...");
+        Serial1.print("AT+NAME=Group7_SamJoe\n\r");
+        Serial1.print("AT+PIN=1234\n\r");
+    }
+
+    // Done
+    Log.infoln("%s: Ready", pcTaskGetName(NULL));
+
+    for (;;)
+    {
+        // Start by checking the buf
+        if (Serial1.available() > 0)
+        {
+            Serial.println(Serial1.read());
+        }
+
+        while (Serial.available() > 0)
+        {
+            Serial1.print(Serial.read());
+        }
+    }
+}
+
+void TaskNavigate(void *pvParameters)
 {
     (void)pvParameters;
     // Setup here
@@ -93,6 +186,11 @@ void TaskLED(void *pvParameters)
 
     // Prev time
     TickType_t prevTime;
+
+    // Configure pins
+    // pinMode(LEFT_LINEFOLLOWER, INPUT);
+    // pinMode(CNTR_LINEFOLLOWER, INPUT);
+    // pinMode(RIGH_LINEFOLLOWER, INPUT);
 
     // We are required to run this inital task for 4 seconds.
     Log.infoln("%s: Beginning bootup sequence.", pcTaskGetName(NULL)); // Log we're booting up
@@ -104,75 +202,145 @@ void TaskLED(void *pvParameters)
     // Pause for a bit
     xTaskDelayUntil(&prevTime, 1000 / portTICK_PERIOD_MS);
 
+    // Memory
+    uint8_t lastSweep = 0;      // Used to keep track of last sweep pos
+    uint8_t sweepUp = true;     // If we're sweeping up
+    occupationMap[0] = 9999.99; // Prepopulate
+
     // Task will never return from here
     for (;;)
     {
+
         /**
-         * == NEW PLAN FOR NEXT TIME ==
-         *
-         * Use an arc, use velocity pid mode too. Sweep a nice smooth arc to the finish and stop when the
-         * odometry says we've traveled for one half a circle!
+         * This section can use either the short (if _err) method
+         * or the long method from the OTHER BRANCH @sam
          */
-
-        // Check if run button pressed
-        if (userButton1.pressed())
+        if (userButton1.pressed()) // Begin regular line following nav from here
         {
-            Log.infoln(F("%s: User button pressed, ready to go"), pcTaskGetName(NULL));
-
-            // Init
-            starAccum = 0;
-
-            setRed();
-
-            /**
-             * Sequence start
-             */
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-
-            starSetpoint = 4;
-            Log.infoln(F("%s: Right"), pcTaskGetName(NULL));
-            while (starAccum < 55)
+            while (true)
             {
-                vTaskDelay(4);
-                setBlue();
-                Log.infoln(F("%s: Wait for %l"), pcTaskGetName(NULL), starAccum);
+                int _err = getError();
+                Log.infoln("Computed error %d", _err);
+
+                if (_err > 20)
+                {
+                    // turn left
+                    starSetpoint = 0;
+                    portSetpoint = 6;
+                }
+                else if (_err < 20)
+                {
+                    // turn right
+                    starSetpoint = 0;
+                    portSetpoint = 6;
+                }
+                else
+                {
+                    // straight
+                    starSetpoint = 13;
+                    portSetpoint = 13;
+                }
             }
+        }
+
+        /**
+         * Occupancy thing from previous submission,
+         * run when we encounter object
+         */
+        // Check if run button pressed (Skipping this for now)
+        if (userButton1.pressed() && false)
+        {
+            Log.infoln("%s: User button pressed, ready to go", pcTaskGetName(NULL));
             setRed();
 
-            starSetpoint = 9;
-            portSetpoint = 9;
-            Log.infoln(F("%s: Forward"), pcTaskGetName(NULL));
-            vTaskDelay(800 / portTICK_PERIOD_MS);
-
-            starSetpoint = 12;
-            portSetpoint = 12;
-            Log.infoln(F("%s: Forward (fast)"), pcTaskGetName(NULL));
-            vTaskDelay(1400 / portTICK_PERIOD_MS);
-
-            setBlue();
-            starSetpoint = 4;
-            portSetpoint = 11;
-            Log.infoln(F("%s: Left"), pcTaskGetName(NULL));
-            vTaskDelay(800 / portTICK_PERIOD_MS);
-            setRed();
-
-            starSetpoint = 15;
-            portSetpoint = 15;
-            Log.infoln(F("%s: Forward"), pcTaskGetName(NULL));
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-
-            starSetpoint = 6;
-            portSetpoint = 3;
-            Log.infoln(F("%s: Right"), pcTaskGetName(NULL));
-            vTaskDelay(700 / portTICK_PERIOD_MS);
-
-            // Stop
+            // Inital just kinda scoot foward
+            starSetpoint = 5;
+            portSetpoint = 5;
+            vTaskDelay(2000 / portTICK_PERIOD_MS);
             starSetpoint = 0;
             portSetpoint = 0;
 
-            vTaskDelay(1500 / portTICK_PERIOD_MS);
-            Log.infoln(F("%s: Done"), pcTaskGetName(NULL));
-            setGreen(); // Done!
+            // Configure/initialize servo
+            if (!sonarServo.attached())
+            {
+                sonarServo.attach(SERVO1_PIN);
+            }
+            sonarServo.write(0);
+
+            // Ready
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+            // Process
+            while (occupationNotReady)
+            {
+                // Sweep control
+                if (sweepUp)
+                {
+                    // We're sweeping up
+                    lastSweep += 1;
+                    if (lastSweep >= occupationMapDensity)
+                    {
+                        lastSweep -= 2;  // Go back one space
+                        sweepUp = false; // Go back down!
+                    }
+                }
+                else
+                {
+                    lastSweep -= 1;
+                    if (lastSweep == 0)
+                    {
+                        sweepUp = true; // Go back up!
+                    }
+                }
+
+                // Perform quick scan
+                setBlue();                                                             // Set LED to blue
+                sonarServo.write(lastSweep * (180.0 / occupationMapDensity));          // Begin moving
+                vTaskDelay(110 / portTICK_PERIOD_MS);                                  // Wait for movement to finish
+                occupationMap[lastSweep] = sonar.dist();                               // Record the distance
+                Log.infoln("Distance at %d: %F", lastSweep, occupationMap[lastSweep]); // Log the distance recorded
+                setRed();                                                              // Set the LED to red
+
+                /**
+                 * Compute the occupation map
+                 */
+                uint8_t _centroid = 0;
+
+                // Iterate the map
+                for (size_t i = 0; i < occupationMapDensity; i++)
+                {
+                    if (occupationMap[i] < occupationMap[_centroid] && occupationMap[i] != 0)
+                    {
+                        _centroid = i;
+                    }
+                }
+
+                Log.infoln("Centroid of map occupation is at %d, distance %F", _centroid, occupationMap[_centroid]);
+
+                if (occupationMap[occupationMapDensity - 1] != 0)
+                {
+                    occupationNotReady = false; // This bool lets the loop know we're ready.
+                }
+
+                // Detach (free timer2 for PWM)
+            }
+
+            // Done
+            sonarServo.write(255 / 2);                             // Return to center
+            Log.infoln("%s: Done scanning.", pcTaskGetName(NULL)); // Log completion
+            setGreen();                                            // Set LED to green
+            sonarServo.detach();
+
+            // Do some driving!
+            starSetpoint = 9;
+            portSetpoint = 4;
+            vTaskDelay(800 / portTICK_PERIOD_MS);
+            starSetpoint = 9;
+            portSetpoint = 9;
+            vTaskDelay(3000 / portTICK_PERIOD_MS);
+            starSetpoint = 0;
+            portSetpoint = 0;
+            Log.infoln("%s: Done moving.", pcTaskGetName(NULL));
         }
 
         // Update all buttons

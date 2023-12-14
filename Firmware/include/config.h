@@ -6,6 +6,9 @@
 // LED
 const int maxBrigh = 20; // Joe's eyes hurt!
 
+// Sonar
+const uint8_t SONAR_STEP_SIZE = 10;
+
 // Template Structs
 struct PIDConfig
 {
